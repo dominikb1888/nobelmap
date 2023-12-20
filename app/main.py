@@ -1,19 +1,48 @@
+from contextlib import asynccontextmanager
 from typing import Union
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from sqlmodel import Session, select
+from db import create_db_and_tables, engine
+from models import NobelWinner, Address, Organization
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    create_db_and_tables()
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
-@app.get("/")
-def read_root():
 
-    return templates.TemplateResponse("index.html", {"request": request, "id": id})
+@app.get("/", response_class=HTMLResponse)
+def index(request: Request):
+    with Session(engine) as session:
+        # add code to get view from DB
+        data = session.exec(select(Address.country)).all()
+        return templates.TemplateResponse(
+            "index.html", {"request": request, "data": data}
+        )
 
 
-@app.get("/nobelwinners/{nobelwinner_id}")
-def read_item(item_id: int, q: Union[str, None] = None):
-    return {"item_id": item_id, "q": q}
+@app.post("/nobelwinners/", response_class=JSONResponse)
+def create_nobelwinners(nobelwinner: NobelWinner):
+    with Session(engine) as session:
+        session.add(nobelwinner)
+        session.commit()
+        session.refresh(nobelwinner)
+        return nobelwinner
+
+
+@app.get(
+    "/nobelwinners/", response_class=JSONResponse, response_model=list[NobelWinner]
+)
+def read_nobelwinners():
+    with Session(engine) as session:
+        nobelwinners = session.exec(select(NobelWinner)).all()
+        return nobelwinners
