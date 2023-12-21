@@ -2,7 +2,7 @@ import json
 from datetime import datetime
 import pycountry
 
-from sqlmodel import Session
+from sqlmodel import Session, select
 from db import engine
 from models import NobelWinner, Address, Organization
 from geojson_pydantic import Feature, Point
@@ -79,16 +79,24 @@ class ImportData:
 
         return names
 
-    def create_organization(self, item: dict, fields: list, id: int) -> Organization:
+    def create_organization(self, item: dict, fields: list) -> int:
         with Session(engine) as session:
-            organization = Organization(name=item["name"], category="", person_id=id)
+            organization = Organization(name=item["name"], category="")
+            existing = session.exec(
+                select(Organization).filter_by(name=organization.name)
+            ).first()
+
+            organization.address_id = self.create_address(item, fields)
+            if existing is not None:
+                return existing.id
+
             session.add(organization)
             session.commit()
             session.refresh(organization)
-            self.create_address(item, fields, id=organization.id)
+
             return organization.id
 
-    def create_address(self, item: dict, fields: list, id: int) -> Address:
+    def create_address(self, item: dict, fields: list) -> int:
         with Session(engine) as session:
             city = next(
                 item[field]
@@ -106,24 +114,23 @@ class ImportData:
                 country = self.lookup_code(code)
 
             coordinates = Point(coordinates=(0, 0), type="Point")
-            if ("geo_point_2d" in fields) and item["geo_point_2d"]:
+            if ("geo_point_2d" in fields) and item.get("geo_point_2d", False):
                 lon, lat = item["geo_point_2d"].values()
                 coordinates.coordinates = (lon, lat)
 
             addict = {
                 "city": city,
-                "country": country.__dict__ if country else None,
-                "coordinates": coordinates.__dict__,
+                "country": dict(country) if country else None,
+                "coordinates": dict(coordinates),
             }
 
-            if "borncountry" in fields:
-                addict["born_id"] = id
-            if "diedcountry" in fields:
-                addict["died_id"] = id
-            if "country" in fields:
-                addict["org_id"] = id
-
             address = Address(**addict)
+
+            existing = session.exec(
+                select(Address).filter_by(city=address.city)
+            ).first()
+            if existing is not None:
+                return existing.id
 
             session.add(address)
             session.commit()
@@ -155,18 +162,30 @@ class ImportData:
                     filtered_item["died"] = datetime.strptime(
                         filtered_item["died"], "%Y-%m-%d"
                     )
+
                 nobelwinner = NobelWinner(**filtered_item)
-                bornaddress_fields = ["borncountrycode", "borncity"]
-                diedaddress_fields = ["diedcountrycode", "diedcity"]
+                bornaddress_fields = ["borncountry", "borncountrycode", "borncity"]
+                diedaddress_fields = ["diedcountry", "diedcountrycode", "diedcity"]
                 orgaddress_fields = ["name", "city", "country", "geo_point_2d"]
+
+                if item.get("borncountry", False):
+                    nobelwinner.bornaddress_id = self.create_address(
+                        item, bornaddress_fields
+                    )
+
+                if item.get("diedcountry", False):
+                    nobelwinner.diedaddress_id = self.create_address(
+                        item, diedaddress_fields
+                    )
+
+                if item.get("country", False):
+                    nobelwinner.org_id = self.create_organization(
+                        item, orgaddress_fields
+                    )
 
                 session.add(nobelwinner)
                 session.commit()
                 session.refresh(nobelwinner)
-
-                self.create_address(item, bornaddress_fields, id=nobelwinner.id)
-                self.create_address(item, diedaddress_fields, id=nobelwinner.id)
-                self.create_organization(item, orgaddress_fields, id=nobelwinner.id)
 
                 print("New Nobelwinner added:", nobelwinner)
 

@@ -25,8 +25,8 @@ async function getJSONData(path) {
 
 async function processData() {
   try {
-    var data = await getJSONData('http://127.0.0.1:8000/nobellaureates')
-    var basemap = await getJSONData('world-110m.geojson')
+    var data = await getJSONData('/nobelwinners', {method:"GET"})
+    var basemap = await getJSONData('/static/data/world-110m.geojson')
     var selected_data = filterData(getCheckedValues(), data )
     var mychart = new Barchart({
       'element': '#barchart',

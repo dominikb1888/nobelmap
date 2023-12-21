@@ -3,7 +3,7 @@ from typing import Optional
 
 from geojson_pydantic import Point
 from pydantic_extra_types.country import CountryInfo
-from sqlmodel import Field, Relationship, SQLModel, Column, JSON
+from sqlmodel import SQLModel, Column, Field, JSON
 
 
 class Address(SQLModel, table=True):
@@ -17,9 +17,6 @@ class Address(SQLModel, table=True):
     coordinates: Optional[Point] = Field(
         sa_column=Column(JSON), default={"all": "true"}
     )
-    born_id: Optional[int] = Field(default=None, foreign_key="nobelwinner.id")
-    died_id: Optional[int] = Field(default=None, foreign_key="nobelwinner.id")
-    org_id: Optional[int] = Field(default=None, foreign_key="organization.id")
 
 
 class Organization(SQLModel, table=True):
@@ -27,7 +24,6 @@ class Organization(SQLModel, table=True):
     name: Optional[str]
     category: Optional[str]
     address_id: Optional[int] = Field(default=None, foreign_key="address.id")
-    person_id: Optional[int] = Field(default=None, foreign_key="nobelwinner.id")
 
 
 class NobelWinner(SQLModel, table=True):
@@ -41,3 +37,6 @@ class NobelWinner(SQLModel, table=True):
     category: Optional[int]
     overallmotivation: Optional[int]
     motivation: Optional[int]
+    bornaddress_id: Optional[int] = Field(default=None, foreign_key="address.id")
+    diedaddress_id: Optional[int] = Field(default=None, foreign_key="address.id")
+    org_id: Optional[int] = Field(default=None, foreign_key="organization.id")
