@@ -15,8 +15,8 @@
       <legend>Countries</legend>
       {% for c in data if c %}
       <div>
-        <input type="checkbox" name="countries" checked="on" id="{{c._fields.alpha_2}}"></input>
-        <label for="{{c._fields.alpha_2}}" class="fib fi-{{c._fields.alpha_2}}"><span class="checkmark"></span></label>
+        <input type="checkbox" name="countries" checked="on" id="{{c.alpha_2}}"></input>
+        <label for="{{c.alpha_2}}" class="fib fi-{{c.alpha_2}}"><span class="checkmark"></span></label>
       </div>
       {% endfor %}
     </fieldset>

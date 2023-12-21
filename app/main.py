@@ -4,9 +4,10 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from sqlmodel import Session, select
+from sqlmodel import Session, select, join
 from db import create_db_and_tables, engine
 from models import NobelWinner, Address, Organization
+from sqlalchemy import text
 
 
 @asynccontextmanager
@@ -30,12 +31,14 @@ def index(request: Request):
         )
 
 
-@app.get("/data/", response_class=JSONResponse, response_model=list)
+@app.get(
+    "/data/",
+    response_class=JSONResponse,
+    response_model=list[Union[NobelWinner, Organization, Address]],
+)
 def read_data():
     with Session(engine) as session:
-        data = session.exec(
-            select(NobelWinner).join(Organization).join(Address).distinct()
-        ).all()
+        data = session.exec(text("SELECT * FROM nobelwinners;")).all()
         return data
 
 
