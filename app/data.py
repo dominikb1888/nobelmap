@@ -86,7 +86,9 @@ class ImportData:
                 select(Organization).filter_by(name=organization.name)
             ).first()
 
-            organization.address_id = self.create_address(item, fields)
+            organization.address_id = self.create_address(
+                item, fields, address_type="organization"
+            )
             if existing is not None:
                 return existing.id
 
@@ -96,7 +98,9 @@ class ImportData:
 
             return organization.id
 
-    def create_address(self, item: dict, fields: list) -> int:
+    def create_address(
+        self, item: dict, fields: list, address_type: str, person_id: int | None = None
+    ) -> int:
         with Session(engine) as session:
             city = next(
                 item[field]
@@ -119,9 +123,11 @@ class ImportData:
                 coordinates.coordinates = (lon, lat)
 
             addict = {
+                "address_type": address_type,
                 "city": city,
                 "country": dict(country) if country else None,
                 "coordinates": dict(coordinates),
+                "person_id": person_id,
             }
 
             address = Address(**addict)
@@ -168,16 +174,6 @@ class ImportData:
                 diedaddress_fields = ["diedcountry", "diedcountrycode", "diedcity"]
                 orgaddress_fields = ["name", "city", "country", "geo_point_2d"]
 
-                if item.get("borncountry", False):
-                    nobelwinner.bornaddress_id = self.create_address(
-                        item, bornaddress_fields
-                    )
-
-                if item.get("diedcountry", False):
-                    nobelwinner.diedaddress_id = self.create_address(
-                        item, diedaddress_fields
-                    )
-
                 if item.get("country", False):
                     nobelwinner.org_id = self.create_organization(
                         item, orgaddress_fields
@@ -186,6 +182,22 @@ class ImportData:
                 session.add(nobelwinner)
                 session.commit()
                 session.refresh(nobelwinner)
+
+                if item.get("borncountry", False):
+                    self.create_address(
+                        item,
+                        bornaddress_fields,
+                        person_id=nobelwinner.id,
+                        address_type="bornaddress",
+                    )
+
+                if item.get("diedcountry", False):
+                    self.create_address(
+                        item,
+                        diedaddress_fields,
+                        person_id=nobelwinner.id,
+                        address_type="diedaddress",
+                    )
 
                 print("New Nobelwinner added:", nobelwinner)
 
